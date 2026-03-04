@@ -12,7 +12,7 @@ You'll build a `dataset-publisher` skill that guides an agent through:
 4. Writing a proper dataset card
 5. Publishing the dataset
 
-This is a practical task that mirrors what the `hugging-face-datasets` skill does in production. By building a simplified version, you'll understand how real skills are structured.
+This is a practical task that mirrors what the `hugging-face-datasets` skill does. By building a simplified version, you'll understand how real skills are structured.
 
 ## Step 1: Create the Skill Directory
 
@@ -26,6 +26,9 @@ mkdir -p dataset-publisher/templates
 ## Step 2: Write the SKILL.md
 
 Create `dataset-publisher/SKILL.md` with the following content:
+
+<details>
+<summary>Click to view the SKILL.md file</summary>
 
 ````markdown
 ---
@@ -126,9 +129,14 @@ print(ds["train"][0])
 - Use streaming uploads for datasets larger than 1GB
 ````
 
+</details>
+
 ## Step 3: Create the Helper Script
 
 Create `dataset-publisher/scripts/add_rows.py`:
+
+<details>
+<summary>Click to view the add_rows.py file</summary>
 
 ```python
 """Add rows to a Hugging Face dataset repository."""
@@ -162,9 +170,14 @@ if __name__ == "__main__":
     add_rows(args.repo_id, args.data_file, args.split)
 ```
 
+</details>
+
 ## Step 4: Create the Dataset Card Template
 
 Create `dataset-publisher/templates/dataset_card.md`:
+
+<details>
+<summary>Click to view the dataset_card.md file</summary>
 
 ```markdown
 ---
@@ -203,6 +216,8 @@ Describe where the data came from and how it was collected.
 
 This dataset is released under the MIT license.
 ```
+
+</details>
 
 ## Step 5: Test Your Skill
 

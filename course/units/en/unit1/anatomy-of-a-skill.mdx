@@ -22,6 +22,17 @@ my-skill/
 
 The `SKILL.md` file references these supporting files by relative path. When the agent needs to run a training script, it knows to look in `scripts/`. When it needs to decide which GPU to use, it can consult `references/reference.md`.
 
+## How the Pieces Work Together
+
+When an agent activates a skill, it follows this general pattern:
+
+1. **Read `SKILL.md`** — Understand the high-level workflow and decision points
+2. **Consult references** — Look up specific guidance (e.g., which GPU for a 3B model)
+3. **Use scripts** — Run helper scripts or adapt templates for the user's task
+4. **Follow the workflow** — Execute the steps in order, reporting progress along the way
+
+The key insight is that the `SKILL.md` serves as the **router** — it tells the agent what to do at each step and where to find the details. The scripts and references provide the **depth** that makes execution reliable.
+
 ## Real-World Example: The Model Trainer Skill
 
 Let's examine the `hugging-face-model-trainer` skill, which teaches agents to fine-tune language models. Its directory looks like this:
@@ -52,9 +63,9 @@ The main instruction file tells the agent:
 
 The scripts in `scripts/` are production-ready templates the agent can use directly or adapt. For example, `train_sft_example.py` includes:
 
-- TRL's `SFTTrainer` configuration with sensible defaults
-- Trackio integration for real-time monitoring
-- LoRA configuration for larger models
+- A trainer configuration with usible defaults.
+- Metric tracking integration for real-time monitoring
+- Optimized training parameters for efficient training
 - Automatic model pushing to the Hub
 
 The agent doesn't write training scripts from scratch — it starts from these tested templates and customizes them for the user's specific task.
@@ -71,58 +82,6 @@ The reference files provide deeper context that the agent can consult when makin
 | < 1B | t4-small | $1-2 | Quick test runs |
 | 1-3B | a10g-small | $5-15 | Few hours |
 | 3-7B | a10g-large + LoRA | $15-40 | Production-ready |
-
-## Real-World Example: The Evaluation Skill
-
-The `hugging-face-evaluation` skill takes a different shape, focused on enriching model cards with benchmark results:
-
-```
-hugging-face-evaluation/
-├── SKILL.md
-├── scripts/
-│   ├── evaluation_manager.py     # Main evaluation orchestrator
-│   └── inspect_eval_uv.py        # Inspect-ai runner for HF Jobs
-├── examples/
-│   ├── usage_examples.md
-│   └── metric_mapping.json       # Standard metric types
-└── references/
-    └── supported_benchmarks.md
-```
-
-This skill's workflow is different from the trainer: it extracts evaluation data from existing model READMEs, imports scores from third-party benchmarks, or runs new evaluations using inspect-ai on HF Jobs infrastructure. The `evaluation_manager.py` script handles all three paths, and the agent selects the right one based on the user's request.
-
-## Real-World Example: The CUDA Kernels Skill
-
-The `cuda-kernels` skill demonstrates how skills can encode highly specialized domain knowledge:
-
-```
-cuda-kernels/
-├── SKILL.md
-├── scripts/
-│   ├── benchmark_example.py
-│   ├── benchmark_rmsnorm.py
-│   └── huggingface_kernels_example.py
-└── references/
-    ├── h100-optimization-guide.md
-    ├── a100-optimization-guide.md
-    ├── kernel-templates.md
-    ├── diffusers-integration.md
-    ├── transformers-integration.md
-    └── troubleshooting.md
-```
-
-Despite being only ~550 tokens in the main `SKILL.md`, this skill covers GPU architecture guidance (compute capabilities, memory bandwidth, shared memory sizes for H100, A100, and T4), integration patterns for both `diffusers` and `transformers`, vectorized memory access templates, and benchmarking workflows. The reference files provide the deep technical detail.
-
-## How the Pieces Work Together
-
-When an agent activates a skill, it follows this general pattern:
-
-1. **Read `SKILL.md`** — Understand the high-level workflow and decision points
-2. **Consult references** — Look up specific guidance (e.g., which GPU for a 3B model)
-3. **Use scripts** — Run helper scripts or adapt templates for the user's task
-4. **Follow the workflow** — Execute the steps in order, reporting progress along the way
-
-The key insight is that the `SKILL.md` serves as the **router** — it tells the agent what to do at each step and where to find the details. The scripts and references provide the **depth** that makes execution reliable.
 
 ## Designing Your Own Skill Structure
 

@@ -4,13 +4,10 @@ When you install a skill, the agent doesn't read every file in the skill directo
 
 ## Why Progressive Disclosure Matters
 
-Coding agents work within a context window — the amount of text they can process at once. Loading an entire skill directory (thousands of tokens of scripts, references, and examples) into context for every request would be wasteful. Most requests only need a fraction of the skill's total knowledge.
+Coding agents work have a context window which determines the amount of text they can process at once. Loading an entire skill directory (thousands of tokens of scripts, references, and examples) into context for every request would be wasteful. Most requests only need a fraction of the skill's total knowledge. 
 
-Progressive disclosure solves this by organizing information in layers:
-
-1. **Layer 0 — Discovery**: The skill's `name` and `description` from the frontmatter
-2. **Layer 1 — Activation**: The main `SKILL.md` body with workflow instructions
-3. **Layer 2 — Deep dive**: Reference documents, scripts, and templates loaded on demand
+> [!NOTE]
+> It's important to only load the information that is needed for the current request. Which we ensure by creating well structured skills with progressive disclosure.
 
 ## How It Works in Practice
 
@@ -52,7 +49,7 @@ The agent never loads the DPO or GRPO templates because this is an SFT task. It 
 
 ## The Agent's Perspective
 
-From the agent's perspective, progressive disclosure works through file system access. The `SKILL.md` acts as a map:
+From the agent's perspective, progressive disclosure works through file system access. The `SKILL.md` acts like a map pointing to the relevant files:
 
 ```markdown
 ## Hardware Selection
@@ -62,6 +59,9 @@ For detailed GPU recommendations by model size, see
 ```
 
 When the agent reaches this point in the workflow, it reads the referenced file. This is a natural pattern for coding agents, which already know how to navigate file systems and read documents.
+
+> [!NOTE]
+> You might also think of the `SKILL.md` as a 'home page' for the skill, pointing to the relevant files for the current step.
 
 ## Designing for Progressive Disclosure
 
