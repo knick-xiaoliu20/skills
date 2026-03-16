@@ -145,6 +145,8 @@ curl -s -H "Authorization: Bearer $HF_TOKEN" \
   "https://huggingface.co/api/papers/search?q=vision+language&limit=20"
 ```
 
+This searches over the paper title, authors, and content.
+
 - Endpoint: `GET /api/papers/search`
 - Query parameters:
   - `q` (string): search query, max length 250
