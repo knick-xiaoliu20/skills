@@ -37,6 +37,11 @@ Rules:
 - prioritize correctness, relevance, completeness, and staying within the skill boundary
 """
 
+SUMMARY_CASE_LIMIT = 2
+SUMMARY_REQUEST_LIMIT = 140
+SUMMARY_ISSUE_LIMIT = 220
+SUMMARY_OUTPUT_LIMIT = 180
+
 
 @dataclass(frozen=True)
 class JudgeConfig:
@@ -177,6 +182,21 @@ def _safe_average(total: float, count: int) -> float:
     return total / count
 
 
+def _truncate_text(value: Any, limit: int) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        text = "; ".join(str(item) for item in value if item)
+    else:
+        text = str(value)
+    text = " ".join(text.split())
+    if not text:
+        return None
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3].rstrip()}..."
+
+
 def _extract_json_object(text: str) -> dict[str, Any]:
     stripped = text.strip()
     if stripped.startswith("```"):
@@ -197,8 +217,17 @@ def _http_json(url: str, *, headers: dict[str, str], payload: dict[str, Any]) ->
         headers={**headers, "Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=90) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = _truncate_text(exc.read().decode("utf-8", errors="replace"), SUMMARY_ISSUE_LIMIT)
+        message = f"HTTP {exc.code} {exc.reason} for {url}"
+        if body:
+            message = f"{message}: {body}"
+        raise RuntimeError(message) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"request to {url} failed: {exc.reason}") from exc
 
 
 def _judge_config() -> JudgeConfig:
@@ -224,11 +253,20 @@ def _judge_config() -> JudgeConfig:
     )
 
 
+def _normalize_anthropic_base_url(base_url: str) -> str:
+    trimmed = base_url.rstrip("/")
+    if trimmed.endswith("/v1"):
+        return trimmed[: -len("/v1")]
+    return trimmed
+
+
 def _call_anthropic(prompt: str, config: JudgeConfig) -> str:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY is required for anthropic judge runs.")
-    base = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
+    base = _normalize_anthropic_base_url(
+        os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+    )
     payload = {
         "model": config.model,
         "max_tokens": 300,
@@ -378,12 +416,18 @@ def _aggregate_metrics(
                 "assertions_total": case_assertions_total,
                 "tokens": test_result.stats.total_tokens or test_result.tokens_used,
                 "turns": test_result.stats.turns or test_result.turns,
+                "input": getattr(test_result.test_case, "input", None),
                 "output": test_result.output,
                 "error": test_result.error,
                 "validation_error": (
                     test_result.validation_result.error_message
                     if test_result.validation_result is not None
                     else None
+                ),
+                "validation_details": (
+                    list(test_result.validation_result.details)
+                    if test_result.validation_result is not None
+                    else []
                 ),
                 "judge_score": judge_score,
                 "judge_summary": judge_summary,
@@ -490,6 +534,65 @@ def _compare_variants(
     return (bool(reasons), reasons, deltas)
 
 
+def _case_issues(case_detail: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    error = _truncate_text(case_detail.get("error"), SUMMARY_ISSUE_LIMIT)
+    if error:
+        issues.append(f"execution error: {error}")
+
+    validation_error = _truncate_text(case_detail.get("validation_error"), SUMMARY_ISSUE_LIMIT)
+    if validation_error:
+        issues.append(f"verifier error: {validation_error}")
+
+    validation_details = case_detail.get("validation_details") or []
+    detail = _truncate_text(validation_details, SUMMARY_ISSUE_LIMIT)
+    if detail:
+        issues.append(f"verifier detail: {detail}")
+
+    if not case_detail.get("success"):
+        assertions_passed = case_detail.get("assertions_passed", 0)
+        assertions_total = case_detail.get("assertions_total", 0)
+        issues.append(f"hard assertions: {assertions_passed}/{assertions_total}")
+
+    judge_summary = _truncate_text(case_detail.get("judge_summary"), SUMMARY_ISSUE_LIMIT)
+    if judge_summary:
+        prefix = "judge issue" if case_detail.get("judge_score") is None else "judge note"
+        issues.append(f"{prefix}: {judge_summary}")
+
+    return issues
+
+
+def _issue_examples(case_details: list[dict[str, Any]]) -> list[str]:
+    examples: list[str] = []
+    for case_detail in case_details:
+        issues = _case_issues(case_detail)
+        if not issues:
+            continue
+
+        request = _truncate_text(case_detail.get("input"), SUMMARY_REQUEST_LIMIT) or "(no request)"
+        line = (
+            f"test {case_detail['test_index']}: request `{request}` | "
+            f"issues: {'; '.join(issues)}"
+        )
+        response = _truncate_text(case_detail.get("output"), SUMMARY_OUTPUT_LIMIT)
+        if response:
+            line = f"{line} | response `{response}`"
+        examples.append(line)
+        if len(examples) >= SUMMARY_CASE_LIMIT:
+            break
+    return examples
+
+
+def _judge_cell(metrics: dict[str, Any]) -> str:
+    judge_score = metrics.get("judge_score")
+    if judge_score is not None:
+        return f"{judge_score:.3f}"
+    case_details = metrics.get("case_details") or []
+    if any(case.get("judge_summary") for case in case_details):
+        return "error"
+    return "n/a"
+
+
 def _render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# Upskill Skill Performance",
@@ -498,6 +601,10 @@ def _render_markdown(report: dict[str, Any]) -> str:
         f"- Eval model: `{report['eval_model']}`",
         f"- Runs per variant: `{report['runs']}`",
     ]
+    if report.get("judge") is not None:
+        lines.append(
+            f"- Judge: `{report['judge']['provider']}` / `{report['judge']['model']}`"
+        )
     if report["selected_scenarios"]:
         lines.append(f"- Selected scenarios: `{', '.join(report['selected_scenarios'])}`")
     else:
@@ -514,16 +621,14 @@ def _render_markdown(report: dict[str, Any]) -> str:
     for scenario in report["scenarios"]:
         current = scenario["current"]
         baseline = scenario["baseline"]
-        current_judge = f"{current['judge_score']:.3f}" if current["judge_score"] is not None else "n/a"
+        current_judge = _judge_cell(current)
         baseline_hard = "n/a"
         baseline_tokens = "n/a"
         baseline_judge = "n/a"
         if baseline is not None:
             baseline_hard = f"{baseline['hard_score']:.3f}"
             baseline_tokens = f"{baseline['avg_tokens']:.1f}"
-            baseline_judge = (
-                f"{baseline['judge_score']:.3f}" if baseline["judge_score"] is not None else "n/a"
-            )
+            baseline_judge = _judge_cell(baseline)
         status = "FAIL" if scenario["regression"] else ("PASS" if baseline is not None else "NEW")
         lines.append(
             "| "
@@ -547,6 +652,19 @@ def _render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"Reasons for `{scenario['scenario_id']}`:")
             for reason in scenario["reasons"]:
                 lines.append(f"- {reason}")
+        current_examples = _issue_examples(current["case_details"])
+        if current_examples:
+            lines.append("")
+            lines.append(f"Issue examples for `{scenario['scenario_id']}` current run:")
+            for example in current_examples:
+                lines.append(f"- {example}")
+        if baseline is not None:
+            baseline_examples = _issue_examples(baseline["case_details"])
+            if baseline_examples:
+                lines.append("")
+                lines.append(f"Issue examples for `{scenario['scenario_id']}` main baseline:")
+                for example in baseline_examples:
+                    lines.append(f"- {example}")
     return "\n".join(lines)
 
 
@@ -661,6 +779,11 @@ async def _run_suite(args: argparse.Namespace) -> dict[str, Any]:
     judge_config = None
     if any((scenario.judge and scenario.judge.enabled) for scenario in selected_scenarios):
         judge_config = _judge_config()
+    report["judge"] = (
+        {"provider": judge_config.provider, "model": judge_config.model}
+        if judge_config is not None
+        else None
+    )
 
     cards_resource = resources.files("upskill").joinpath("agent_cards")
     with resources.as_file(cards_resource) as cards_path, tempfile.TemporaryDirectory(
