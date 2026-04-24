@@ -66,7 +66,7 @@ Leaderboards are automatically updated via GitHub Actions workflows.
 
 ## Security
 
-Please review our [Security Policy](.github/workflows/SECURITY.md) before reporting vulnerabilities.
+Please review our [Security Policy](.github/SECURITY.md) before reporting vulnerabilities.
 
 ## License
 
