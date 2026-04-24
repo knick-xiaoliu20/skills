@@ -71,6 +71,7 @@ Leaderboards are automatically updated via GitHub Actions workflows.
 - Run `python -m pytest skills/` before opening any PR upstream
 - When testing new skills locally, use the `--dry-run` flag to avoid hitting rate limits
 - Keep an eye on the `generate-agents.yml` run after pushing; it occasionally needs a manual re-trigger
+- Use `python -m pytest skills/ -k "not slow"` for a quicker feedback loop during active development
 
 ## Security
 
