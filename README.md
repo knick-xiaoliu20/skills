@@ -64,6 +64,14 @@ This project maintains two leaderboards:
 
 Leaderboards are automatically updated via GitHub Actions workflows.
 
+## Local Development Notes
+
+> These are personal reminders for my own workflow — feel free to ignore.
+
+- Run `python -m pytest skills/` before opening any PR upstream
+- When testing new skills locally, use the `--dry-run` flag to avoid hitting rate limits
+- Keep an eye on the `generate-agents.yml` run after pushing; it occasionally needs a manual re-trigger
+
 ## Security
 
 Please review our [Security Policy](.github/SECURITY.md) before reporting vulnerabilities.
