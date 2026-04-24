@@ -6,6 +6,8 @@ A fork of [huggingface/skills](https://huggingface.co/skills) — a collection o
 
 This repository contains a curated set of skills that can be used with AI assistants and coding tools. Skills are modular, composable units that extend the capabilities of AI agents.
 
+> **Personal note:** I'm using this fork primarily to experiment with custom coding and code-review skills for my own projects. The upstream repo is great but I wanted a sandbox to iterate faster.
+
 ## Structure
 
 ```
