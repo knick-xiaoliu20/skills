@@ -80,39 +80,9 @@ def generate_agents() -> int:
             save_marketplace(path, {"agents": [], "version": "1.0.0", "generated": True})
         return 0
 
-    skill_files = list(SKILLS_DIR.glob("**/*.json"))
+    # Sort skill files so the output order is deterministic across runs
+    skill_files = sorted(SKILLS_DIR.glob("**/*.json"))
     if not skill_files:
         print("No skill files found.")
         return 0
 
-    print(f"Found {len(skill_files)} skill file(s).")
-
-    claude_marketplace = load_existing_marketplace(CLAUDE_MARKETPLACE)
-    cursor_marketplace = load_existing_marketplace(CURSOR_MARKETPLACE)
-
-    claude_agents: list[dict[str, Any]] = []
-    cursor_agents: list[dict[str, Any]] = []
-
-    errors = 0
-    for skill_path in sorted(skill_files):
-        try:
-            skill = load_skill(skill_path)
-            claude_agents.append(skill_to_claude_agent(skill))
-            cursor_agents.append(skill_to_cursor_agent(skill))
-            print(f"  Processed: {skill_path.name} -> {skill.get('id', 'unknown')}")
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"  ERROR processing {skill_path}: {e}", file=sys.stderr)
-            errors += 1
-
-    claude_marketplace["agents"] = claude_agents
-    cursor_marketplace["agents"] = cursor_agents
-
-    save_marketplace(CLAUDE_MARKETPLACE, claude_marketplace)
-    save_marketplace(CURSOR_MARKETPLACE, cursor_marketplace)
-
-    print(f"\nGenerated {len(claude_agents)} agent(s). Errors: {errors}")
-    return 1 if errors else 0
-
-
-if __name__ == "__main__":
-    sys.exit(generate_agents())
