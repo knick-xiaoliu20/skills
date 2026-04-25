@@ -72,6 +72,7 @@ Leaderboards are automatically updated via GitHub Actions workflows.
 - When testing new skills locally, use the `--dry-run` flag to avoid hitting rate limits
 - Keep an eye on the `generate-agents.yml` run after pushing; it occasionally needs a manual re-trigger
 - Use `python -m pytest skills/ -k "not slow"` for a quicker feedback loop during active development
+- Use `python -m pytest skills/ -x` to stop on the first failure — handy when debugging a broken skill
 
 ## Security
 
@@ -79,4 +80,4 @@ Please review our [Security Policy](.github/SECURITY.md) before reporting vulner
 
 ## License
 
-This project is licensed under the Apache 2.0 License — see the [LICENSE](LICENSE) file for details.
+This project i
